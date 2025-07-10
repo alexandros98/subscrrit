@@ -19,12 +19,8 @@ cursor =  conn.cursor()
 
 
 #MENU AND SHIT
-print("Welcome to this shitty ass application.\nAttempting to connect to the database...")
-try:
-    cursor = db_connect()
-    print("Okay i made it.")
-except:
-    print("Nah it did not work, bye")
+print("Welcome to this shitty ass application.")
+
 
 userin = input("Search for a customer using the VAR number or his name:\n>")
 
