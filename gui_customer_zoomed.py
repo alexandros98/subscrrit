@@ -1,53 +1,50 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
+import pyodbc
+import uuid
+
 
 class CustomerZoomedWindow(tk.Toplevel):
-    def __init__(self, master=None):
+    def __init__(self, master=None, customer_data=None):
         super().__init__(master)
         self.title("Customer Information")
         self.geometry("1000x800")
         self.configure(padx=20, pady=20)
 
-        # === Container: Options ===
+        self.entries = {}
+
+        # Options
         options_frame = ttk.LabelFrame(self, text="Options", padding=10)
         options_frame.pack(fill="x", padx=10, pady=(0, 10))
 
-        def on_save():
-            print("Save button clicked!")
-            # Add save logic here
-
-        save_button = ttk.Button(options_frame, text="Save", command=on_save)
-        save_button.pack(side="left", padx=5)
-
+        save_button = ttk.Button(options_frame, text="Save", command=self.on_save)
         close_button = ttk.Button(options_frame, text="Close", command=self.destroy)
+
+        save_button.pack(side="left", padx=5)
         close_button.pack(side="left", padx=5)
 
-        # === Container: Basic Info ===
+        # Basic Info
         basic_info_frame = ttk.LabelFrame(self, text="Basic Info", padding=10)
         basic_info_frame.pack(fill="x", padx=10, pady=10)
 
-        # --- Sub-container: General Info ---
         general_info_frame = ttk.Frame(basic_info_frame)
         general_info_frame.pack(fill="x", pady=(0, 10))
 
         general_fields = [
             "Name", "VAT Nr", "Profession", "Address",
-            "City", "Postal Code", "Country"
+            "City", "Postal Code"
         ]
-        self.entries = {}
 
         for i, field in enumerate(general_fields):
             label = ttk.Label(general_info_frame, text=field + ":")
-            label.grid(row=i, column=0, sticky="e", padx=5, pady=2)
             entry = ttk.Entry(general_info_frame, width=60)
+            label.grid(row=i, column=0, sticky="e", padx=5, pady=2)
             entry.grid(row=i, column=1, sticky="w", padx=5, pady=2)
             self.entries[field] = entry
 
-        # --- Sub-containers frame for Phones and Emails side-by-side ---
         contact_frame = ttk.Frame(basic_info_frame)
         contact_frame.pack(fill="x", pady=10)
 
-        # --- Phones frame ---
         phones_frame = ttk.LabelFrame(contact_frame, text="Phones", padding=10)
         phones_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
 
@@ -65,7 +62,6 @@ class CustomerZoomedWindow(tk.Toplevel):
             self.entries[f"Phone Type {i+1}"] = entry_type
             self.entries[f"Phone {i+1}"] = entry_phone
 
-        # --- Emails frame ---
         emails_frame = ttk.LabelFrame(contact_frame, text="Emails", padding=10)
         emails_frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
 
@@ -83,49 +79,120 @@ class CustomerZoomedWindow(tk.Toplevel):
             self.entries[f"Email Type {i+1}"] = entry_type
             self.entries[f"Email {i+1}"] = entry_email
 
-        # === Container: Subscriptions ===
         subscriptions_frame = ttk.LabelFrame(self, text="Subscriptions", padding=10)
         subscriptions_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         columns = ("Name", "Family", "Purchase Date", "Expiration Date", "Quantity")
-
-        # Create a Treeview and attach a scrollbar
         tree_scrollbar = ttk.Scrollbar(subscriptions_frame, orient="vertical")
         self.tree = ttk.Treeview(
-            subscriptions_frame,
-            columns=columns,
-            show="headings",
-            yscrollcommand=tree_scrollbar.set
+            subscriptions_frame, columns=columns, show="headings", yscrollcommand=tree_scrollbar.set
         )
         tree_scrollbar.config(command=self.tree.yview)
         tree_scrollbar.pack(side="right", fill="y")
         self.tree.pack(fill="both", expand=True, side="left")
 
-        # Configure Treeview columns
         for col in columns:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="center", width=150)
 
-        # Insert 10 example subscriptions
-        example_subs = [
-            ("Newsletter", "Marketing", "2023-01-01", "2024-01-01", 1),
-            ("Premium Access", "Digital", "2023-06-15", "2024-06-15", 3),
-            ("Video Library", "Entertainment", "2023-02-10", "2024-02-10", 2),
-            ("Fitness Plan", "Health", "2023-03-01", "2024-03-01", 1),
-            ("eBooks", "Education", "2023-05-20", "2024-05-20", 5),
-            ("Music Pass", "Entertainment", "2023-08-01", "2024-08-01", 2),
-            ("Language Course", "Education", "2023-07-15", "2024-07-15", 1),
-            ("Cloud Storage", "Utilities", "2023-09-01", "2024-09-01", 1),
-            ("VPN Service", "Security", "2023-10-01", "2024-10-01", 1),
-            ("Analytics Suite", "Business", "2023-11-10", "2024-11-10", 10),
-        ]
+        if customer_data:
+            self.prefill_customer_info(customer_data)
 
-        for sub in example_subs:
-            self.tree.insert("", tk.END, values=sub)
+    def connect_db(self):
+        return pyodbc.connect(
+            'DRIVER={ODBC Driver 17 for SQL Server};'
+            'SERVER=COMPUTOR\\ALEXTESTS22;'
+            'DATABASE=okay;UID=sa;PWD=1'
+        )
+
+    def on_save(self):
+        try:
+            values = {field: self.entries[field].get() for field in self.entries}
+            values["id"] = str(uuid.uuid4())
+
+            print("\n--- DEBUG: Customer Save ---")
+            for k, v in values.items():
+                print(f"{k}: {v}")
+
+            conn = self.connect_db()
+            print("Connected to DB:", conn.getinfo(pyodbc.SQL_DATABASE_NAME))
+
+            cursor = conn.cursor()
+
+            query = """INSERT INTO customers(
+                id, name, vatNr, profession, address, city, postalCode,
+                phone1Type, phone1,
+                phone2Type, phone2,
+                phone3Type, phone3,
+                email1Type, email1,
+                email2Type, email2,
+                email3Type, email3
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+            params = (
+                values["id"], values["Name"], values["VAT Nr"], values["Profession"], values["Address"],
+                values["City"], values["Postal Code"],
+                values["Phone Type 1"], values["Phone 1"],
+                values["Phone Type 2"], values["Phone 2"],
+                values["Phone Type 3"], values["Phone 3"],
+                values["Email Type 1"], values["Email 1"],
+                values["Email Type 2"], values["Email 2"],
+                values["Email Type 3"], values["Email 3"]
+            )
+
+            print("Executing SQL INSERT...")
+            cursor.execute(query, params)
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            print("Customer saved successfully.")
+            messagebox.showinfo("Success", "Customer saved successfully.")
+            self.destroy()
+            self.master.load_customers()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save customer:\n{e}")
+            print("ERROR:", e)
+
+    def prefill_customer_info(self, data):
+        (
+            name, vat, profession, address,
+            city, postal_code, country,  # country is ignored now
+            phone1_type, phone1,
+            phone2_type, phone2,
+            phone3_type, phone3,
+            email1_type, email1,
+            email2_type, email2,
+            email3_type, email3
+        ) = data
+
+        field_map = {
+            "Name": name,
+            "VAT Nr": vat,
+            "Profession": profession,
+            "Address": address,
+            "City": city,
+            "Postal Code": postal_code,
+            "Phone Type 1": phone1_type,
+            "Phone 1": phone1,
+            "Phone Type 2": phone2_type,
+            "Phone 2": phone2,
+            "Phone Type 3": phone3_type,
+            "Phone 3": phone3,
+            "Email Type 1": email1_type,
+            "Email 1": email1,
+            "Email Type 2": email2_type,
+            "Email 2": email2,
+            "Email Type 3": email3_type,
+            "Email 3": email3,
+        }
+
+        for field, value in field_map.items():
+            if field in self.entries and value is not None:
+                self.entries[field].insert(0, str(value))
 
 
-# For standalone test (optional)
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw()  # Hide main window
+    root.withdraw()
     CustomerZoomedWindow(root).mainloop()
