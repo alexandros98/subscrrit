@@ -118,7 +118,7 @@ class CustomerListApp(tk.Tk):
         cursor = conn.cursor()
         query = """
             SELECT customers.id, customers.name, customers.vatNr, customers.profession, customers.address,
-                customers.city, customers.postalCode, customers.country, customers.type,
+                customers.city, customers.postalCode, countries.name,
                 customers.phone1Type, customers.phone1,
                 customers.phone2Type, customers.phone2,
                 customers.phone3Type, customers.phone3,
@@ -126,6 +126,7 @@ class CustomerListApp(tk.Tk):
                 customers.email2Type, customers.email2,
                 customers.email3Type, customers.email3
             FROM customers
+            left JOIN countries ON countries.code = customers.country
             WHERE customers.vatNr = ?
         """
         cursor.execute(query, vat_nr)
