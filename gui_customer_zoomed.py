@@ -12,9 +12,8 @@ class CustomerZoomedWindow(tk.Toplevel):
         self.configure(padx=20, pady=20)
 
         self.entries = {}
-        self.customer_id = None  # <-- Track existing customer ID
+        self.customer_id = customer_data[0]
 
-        # Options
         options_frame = ttk.LabelFrame(self, text="Options", padding=10)
         options_frame.pack(fill="x", padx=10, pady=(0, 10))
 
@@ -24,7 +23,6 @@ class CustomerZoomedWindow(tk.Toplevel):
         save_button.pack(side="left", padx=5)
         close_button.pack(side="left", padx=5)
 
-        # Basic Info
         basic_info_frame = ttk.LabelFrame(self, text="Basic Info", padding=10)
         basic_info_frame.pack(fill="x", padx=10, pady=10)
 
@@ -42,6 +40,24 @@ class CustomerZoomedWindow(tk.Toplevel):
             label.grid(row=i, column=0, sticky="e", padx=5, pady=2)
             entry.grid(row=i, column=1, sticky="w", padx=5, pady=2)
             self.entries[field] = entry
+
+        # --- Country Dropdown ---
+        label_country = ttk.Label(general_info_frame, text="Country:")
+        label_country.grid(row=len(general_fields), column=0, sticky="e", padx=5, pady=2)
+
+        self.country_var = tk.StringVar()
+        self.country_dropdown = ttk.Combobox(general_info_frame, textvariable=self.country_var, width=57, state="readonly")
+        self.country_dropdown.grid(row=len(general_fields), column=1, sticky="w", padx=5, pady=2)
+        self.country_map = {}  # name -> code
+
+        # ---- Type Dropdown ---
+        label_type = ttk.Label(general_info_frame, text="Customer Type:")
+        label_type.grid(row=len(general_fields)+1, column=0, sticky="e", padx=5, pady=2)
+
+        self.type_var = tk.StringVar()
+        self.type_dropdown = ttk.Combobox(general_info_frame, textvariable=self.type_var, width=57, state="readonly")
+        self.type_dropdown.grid(row=len(general_fields)+1, column=1, sticky="w", padx=5, pady=2)
+        self.type_map = {}  # name -> code
 
         contact_frame = ttk.Frame(basic_info_frame)
         contact_frame.pack(fill="x", pady=10)
@@ -80,6 +96,8 @@ class CustomerZoomedWindow(tk.Toplevel):
             self.entries[f"Email Type {i+1}"] = entry_type
             self.entries[f"Email {i+1}"] = entry_email
 
+
+        # --- subscriptions related stuff start here ---
         subscriptions_frame = ttk.LabelFrame(self, text="Subscriptions", padding=10)
         subscriptions_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -95,6 +113,38 @@ class CustomerZoomedWindow(tk.Toplevel):
         for col in columns:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="center", width=150)
+        
+        #my attempt to connect to the database and fill the rows
+        try:
+            conn = self.connect_db()
+            cursor = conn.cursor()
+            query = ("""
+                select software_products.name, software_family.name, purchase_date, expiration_date, customer_subscriptions.quantity
+                from customer_subscriptions
+                inner join software_products on software_products.id = customer_subscriptions.product
+                inner join software_family on software_family.code = software_products.id
+                where customer_subscriptions.customer = ?
+            """)
+            cursor.execute(query, self.customer_id)
+            customer_subscriptions = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            print("****************Data fetched succesfully********************")
+            print(self.customer_id)
+            print(customer_subscriptions)
+        except:
+            print("data could not be fetched")
+        print("---------------------------------------------------------------------------------")
+        print(customer_subscriptions)
+
+        for row in customer_subscriptions:
+            # Convert all items in the row to string (especially date objects)
+            formatted_row = [str(item) for item in row]
+            print("Inserting formatted row:", formatted_row)
+            self.tree.insert("", "end", values=formatted_row)
+
+        self.load_countries()
+        self.load_customer_types()
 
         if customer_data:
             self.prefill_customer_info(customer_data)
@@ -106,20 +156,46 @@ class CustomerZoomedWindow(tk.Toplevel):
             'DATABASE=okay;UID=sa;PWD=1'
         )
 
+    def load_countries(self):
+
+        try:
+            conn = self.connect_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT code, name FROM countries ORDER BY name")
+            countries = cursor.fetchall()
+            cursor.close()
+            conn.close()
+
+            # Map country name to code
+            self.country_map = {name: code for code, name in countries}
+            self.country_dropdown['values'] = list(self.country_map.keys())
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not load countries:\n{e}")
+
+    def load_customer_types(self):
+        try:
+            conn = self.connect_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT code, name FROM customer_type ORDER BY name")
+            types = cursor.fetchall()
+            cursor.close()
+            conn.close()
+
+            self.type_map = {name: code for code, name in types}
+            self.type_dropdown['values'] = list(self.type_map.keys())
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not load customer types:\n{e}")
+
     def on_save(self):
         try:
             values = {field: self.entries[field].get() for field in self.entries}
-
-            print("\n--- DEBUG: Customer Save ---")
-            for k, v in values.items():
-                print(f"{k}: {v}")
+            country_code = self.country_map.get(self.country_var.get())
+            type_code = self.type_map.get(self.type_var.get())
 
             conn = self.connect_db()
             cursor = conn.cursor()
 
             if self.customer_id:
-                # Update existing customer
-                print(f"Updating existing customer ID: {self.customer_id}")
                 query = """
                     UPDATE customers SET
                         name = ?, vatNr = ?, profession = ?, address = ?, city = ?, postalCode = ?,
@@ -128,7 +204,9 @@ class CustomerZoomedWindow(tk.Toplevel):
                         phone3Type = ?, phone3 = ?,
                         email1Type = ?, email1 = ?,
                         email2Type = ?, email2 = ?,
-                        email3Type = ?, email3 = ?
+                        email3Type = ?, email3 = ?,
+                        country = ?,
+                        type = ?
                     WHERE id = ?
                 """
                 params = (
@@ -140,92 +218,97 @@ class CustomerZoomedWindow(tk.Toplevel):
                     values["Email Type 1"], values["Email 1"],
                     values["Email Type 2"], values["Email 2"],
                     values["Email Type 3"], values["Email 3"],
+                    country_code,
+                    type_code,
                     self.customer_id
                 )
-                print("Customer updated successfully.")
-                messagebox.showinfo("Success", "Customer updated successfully.")
+                cursor.execute(query, params)
             else:
-                # Insert new customer
-                self.customer_id = str(uuid.uuid4())
-                print(f"Inserting new customer ID: {self.customer_id}")
+                new_id = str(uuid.uuid4())
                 query = """
-                    INSERT INTO customers(
-                        id, name, vatNr, profession, address, city, postalCode,
-                        phone1Type, phone1,
-                        phone2Type, phone2,
-                        phone3Type, phone3,
-                        email1Type, email1,
-                        email2Type, email2,
-                        email3Type, email3
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO customers
+                        (id, name, vatNr, profession, address, city, postalCode,
+                         phone1Type, phone1,
+                         phone2Type, phone2,
+                         phone3Type, phone3,
+                         email1Type, email1,
+                         email2Type, email2,
+                         email3Type, email3,
+                         country)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 params = (
-                    self.customer_id, values["Name"], values["VAT Nr"], values["Profession"], values["Address"],
+                    new_id, values["Name"], values["VAT Nr"], values["Profession"], values["Address"],
                     values["City"], values["Postal Code"],
                     values["Phone Type 1"], values["Phone 1"],
                     values["Phone Type 2"], values["Phone 2"],
                     values["Phone Type 3"], values["Phone 3"],
                     values["Email Type 1"], values["Email 1"],
                     values["Email Type 2"], values["Email 2"],
-                    values["Email Type 3"], values["Email 3"]
+                    values["Email Type 3"], values["Email 3"],
+                    country_code
                 )
-                print("Customer saved successfully.")
-                messagebox.showinfo("Success", "Customer saved successfully.")
+                cursor.execute(query, params)
 
-            cursor.execute(query, params)
             conn.commit()
             cursor.close()
             conn.close()
-
+            messagebox.showinfo("Success", "Customer data saved successfully!")
             self.destroy()
-            self.master.load_customers()
-
+            if self.master:
+                self.master.load_customers()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save customer:\n{e}")
-            print("ERROR:", e)
+            messagebox.showerror("Error", f"Could not save customer data:\n{e}")
 
     def prefill_customer_info(self, data):
+        # Data tuple:
+        # (id, name, vatNr, profession, address, city, postalCode, country_code,
+        #  phone1Type, phone1, phone2Type, phone2, phone3Type, phone3,
+        #  email1Type, email1, email2Type, email2, email3Type, email3)
+
+        if not data:
+            return
+
         (
-            id_value,
-            name, vat, profession, address,
-            city, postal_code, country,
-            phone1_type, phone1,
-            phone2_type, phone2,
-            phone3_type, phone3,
-            email1_type, email1,
-            email2_type, email2,
-            email3_type, email3
+            self.customer_id, name, vat_nr, profession, address, city, postal_code, country_code, customer_type_code,
+            phone1Type, phone1, phone2Type, phone2, phone3Type, phone3,
+            email1Type, email1, email2Type, email2, email3Type, email3
         ) = data
 
-        self.customer_id = id_value  # <-- Save ID for update
+        #print("Opening edit window with:", data[0])
+        self.temp = data[0]
 
-        field_map = {
-            "Name": name,
-            "VAT Nr": vat,
-            "Profession": profession,
-            "Address": address,
-            "City": city,
-            "Postal Code": postal_code,
-            "Phone Type 1": phone1_type,
-            "Phone 1": phone1,
-            "Phone Type 2": phone2_type,
-            "Phone 2": phone2,
-            "Phone Type 3": phone3_type,
-            "Phone 3": phone3,
-            "Email Type 1": email1_type,
-            "Email 1": email1,
-            "Email Type 2": email2_type,
-            "Email 2": email2,
-            "Email Type 3": email3_type,
-            "Email 3": email3,
-        }
+        self.entries["Name"].insert(0, name or "")
+        self.entries["VAT Nr"].insert(0, vat_nr or "")
+        self.entries["Profession"].insert(0, profession or "")
+        self.entries["Address"].insert(0, address or "")
+        self.entries["City"].insert(0, city or "")
+        self.entries["Postal Code"].insert(0, postal_code or "")
 
-        for field, value in field_map.items():
-            if field in self.entries and value is not None:
-                self.entries[field].insert(0, str(value))
+        # Set country dropdown by matching country code
+        if country_code:
+            for cname, ccode in self.country_map.items():
+                if ccode == country_code:
+                    self.country_var.set(cname)
+                    break
 
+        # Set customer type dropdown by matching code
+        if customer_type_code:
+            for tname, tcode in self.type_map.items():
+                if tcode == customer_type_code:
+                    self.type_var.set(tname)
+                    break
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.withdraw()
-    CustomerZoomedWindow(root).mainloop()
+        self.entries["Phone Type 1"].insert(0, phone1Type or "")
+        self.entries["Phone 1"].insert(0, phone1 or "")
+        self.entries["Phone Type 2"].insert(0, phone2Type or "")
+        self.entries["Phone 2"].insert(0, phone2 or "")
+        self.entries["Phone Type 3"].insert(0, phone3Type or "")
+        self.entries["Phone 3"].insert(0, phone3 or "")
+
+        self.entries["Email Type 1"].insert(0, email1Type or "")
+        self.entries["Email 1"].insert(0, email1 or "")
+        self.entries["Email Type 2"].insert(0, email2Type or "")
+        self.entries["Email 2"].insert(0, email2 or "")
+        self.entries["Email Type 3"].insert(0, email3Type or "")
+        self.entries["Email 3"].insert(0, email3 or "")
