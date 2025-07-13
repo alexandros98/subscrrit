@@ -12,6 +12,7 @@ class CustomerZoomedWindow(tk.Toplevel):
         self.configure(padx=20, pady=20)
 
         self.entries = {}
+        self.customer_id = None  # <-- Track existing customer ID
 
         # Options
         options_frame = ttk.LabelFrame(self, text="Options", padding=10)
@@ -108,56 +109,86 @@ class CustomerZoomedWindow(tk.Toplevel):
     def on_save(self):
         try:
             values = {field: self.entries[field].get() for field in self.entries}
-            values["id"] = str(uuid.uuid4())
 
             print("\n--- DEBUG: Customer Save ---")
             for k, v in values.items():
                 print(f"{k}: {v}")
 
             conn = self.connect_db()
-            print("Connected to DB:", conn.getinfo(pyodbc.SQL_DATABASE_NAME))
-
             cursor = conn.cursor()
 
-            query = """INSERT INTO customers(
-                id, name, vatNr, profession, address, city, postalCode,
-                phone1Type, phone1,
-                phone2Type, phone2,
-                phone3Type, phone3,
-                email1Type, email1,
-                email2Type, email2,
-                email3Type, email3
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+            if self.customer_id:
+                # Update existing customer
+                print(f"Updating existing customer ID: {self.customer_id}")
+                query = """
+                    UPDATE customers SET
+                        name = ?, vatNr = ?, profession = ?, address = ?, city = ?, postalCode = ?,
+                        phone1Type = ?, phone1 = ?,
+                        phone2Type = ?, phone2 = ?,
+                        phone3Type = ?, phone3 = ?,
+                        email1Type = ?, email1 = ?,
+                        email2Type = ?, email2 = ?,
+                        email3Type = ?, email3 = ?
+                    WHERE id = ?
+                """
+                params = (
+                    values["Name"], values["VAT Nr"], values["Profession"], values["Address"],
+                    values["City"], values["Postal Code"],
+                    values["Phone Type 1"], values["Phone 1"],
+                    values["Phone Type 2"], values["Phone 2"],
+                    values["Phone Type 3"], values["Phone 3"],
+                    values["Email Type 1"], values["Email 1"],
+                    values["Email Type 2"], values["Email 2"],
+                    values["Email Type 3"], values["Email 3"],
+                    self.customer_id
+                )
+                print("Customer updated successfully.")
+                messagebox.showinfo("Success", "Customer updated successfully.")
+            else:
+                # Insert new customer
+                self.customer_id = str(uuid.uuid4())
+                print(f"Inserting new customer ID: {self.customer_id}")
+                query = """
+                    INSERT INTO customers(
+                        id, name, vatNr, profession, address, city, postalCode,
+                        phone1Type, phone1,
+                        phone2Type, phone2,
+                        phone3Type, phone3,
+                        email1Type, email1,
+                        email2Type, email2,
+                        email3Type, email3
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                params = (
+                    self.customer_id, values["Name"], values["VAT Nr"], values["Profession"], values["Address"],
+                    values["City"], values["Postal Code"],
+                    values["Phone Type 1"], values["Phone 1"],
+                    values["Phone Type 2"], values["Phone 2"],
+                    values["Phone Type 3"], values["Phone 3"],
+                    values["Email Type 1"], values["Email 1"],
+                    values["Email Type 2"], values["Email 2"],
+                    values["Email Type 3"], values["Email 3"]
+                )
+                print("Customer saved successfully.")
+                messagebox.showinfo("Success", "Customer saved successfully.")
 
-            params = (
-                values["id"], values["Name"], values["VAT Nr"], values["Profession"], values["Address"],
-                values["City"], values["Postal Code"],
-                values["Phone Type 1"], values["Phone 1"],
-                values["Phone Type 2"], values["Phone 2"],
-                values["Phone Type 3"], values["Phone 3"],
-                values["Email Type 1"], values["Email 1"],
-                values["Email Type 2"], values["Email 2"],
-                values["Email Type 3"], values["Email 3"]
-            )
-
-            print("Executing SQL INSERT...")
             cursor.execute(query, params)
             conn.commit()
             cursor.close()
             conn.close()
 
-            print("Customer saved successfully.")
-            messagebox.showinfo("Success", "Customer saved successfully.")
             self.destroy()
             self.master.load_customers()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save customer:\n{e}")
             print("ERROR:", e)
 
     def prefill_customer_info(self, data):
         (
+            id_value,
             name, vat, profession, address,
-            city, postal_code, country,  # country is ignored now
+            city, postal_code, country,
             phone1_type, phone1,
             phone2_type, phone2,
             phone3_type, phone3,
@@ -165,6 +196,8 @@ class CustomerZoomedWindow(tk.Toplevel):
             email2_type, email2,
             email3_type, email3
         ) = data
+
+        self.customer_id = id_value  # <-- Save ID for update
 
         field_map = {
             "Name": name,

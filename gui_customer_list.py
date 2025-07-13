@@ -117,7 +117,7 @@ class CustomerListApp(tk.Tk):
         conn = self.connect_db()
         cursor = conn.cursor()
         query = """
-            SELECT customers.name, customers.vatNr, customers.profession, customers.address,
+            SELECT customers.id, customers.name, customers.vatNr, customers.profession, customers.address,
                 customers.city, customers.postalCode, countries.name,
                 customers.phone1Type, customers.phone1,
                 customers.phone2Type, customers.phone2,
