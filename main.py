@@ -1,45 +1,32 @@
-import pyodbc
+import tkinter as tk
+from tkinter import ttk
 
-# Database connection settings
-server = "COMPUTOR\\ALEXTESTS22"  # e.g. 'localhost\\SQLEXPRESS'
-database = "okay"
-username = "sa"
-password = "1"
+# Create main window
+root = tk.Tk()
+root.title("Tkinter Containers Example")
+root.geometry("1000x600")
 
-# Connect to SQL Server
-conn = pyodbc.connect(
-    f'DRIVER={{ODBC Driver 17 for SQL Server}};'
-    f'SERVER={server};'
-    f'DATABASE={database};'
-    f'UID={username};'
-    f'PWD={password}'
-)
+style = ttk.Style()
+style.configure("My.TFrame", borderwidth=2, relief="solid")
+style.configure("Border.TLabel", padding=5, borderwidth=2, relief="solid")
 
-cursor =  conn.cursor()
+#--------------FRAME 1--------------
+frame1 = ttk.Frame(root, padding="10", style="My.TFrame")
+frame1.pack(fill="both", pady=10,side="left", expand=True)
 
+label1 =  ttk.Label(frame1, text="This is a frame with padding",style="Border.TLabel")
+label1.pack(pady=10)
+label2 = ttk.Label(frame1, text="It contains labels and buttons",style="Border.TLabel")
+label2.pack(pady=10)
 
-#MENU AND SHIT
-print("Welcome to this shitty ass application.")
+#--------------FRAME 2--------------
+frame2 = ttk.Frame(root, padding="10", style="My.TFrame")
+frame2.pack(fill="both", pady=10, side="right",expand=True)  
 
+label1 =  ttk.Label(frame2, text="This is a frame with padding",style="Border.TLabel")
+label1.pack(pady=10)
+label2 = ttk.Label(frame2, text="It contains labels and buttons",style="Border.TLabel")
+label2.pack(pady=10)
 
-userin = input("Search for a customer using the VAR number or his name:\n>")
-
-# Your query
-searchCustomerQRY = """
-SELECT name, profession, vatnr, address, city, postalcode
-FROM customers
-WHERE vatnr LIKE ? OR name LIKE ?
-"""
-params = (f"%{userin}%", f"%{userin}%")
-cursor.execute(searchCustomerQRY,params)
-
-print("Your input:" + userin + "\nResult:")
-
-# Fetch and print results
-rows = cursor.fetchall()
-for row in rows:
-    print(row)
-
-# Clean up
-cursor.close()
-conn.close()
+# Start the main event loop
+root.mainloop()
