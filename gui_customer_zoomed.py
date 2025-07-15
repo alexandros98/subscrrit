@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import pyodbc
 import uuid
+from gui_subscriptions_zoomed import SubscriptionsZoomedWindow
 
 
 class CustomerZoomedWindow(tk.Toplevel):
@@ -298,12 +299,22 @@ class CustomerZoomedWindow(tk.Toplevel):
         self.entries["Email Type 3"].insert(0, email3Type or "")
         self.entries["Email 3"].insert(0, email3 or "")
 
-    # --- New Buttons' Placeholder Methods ---
+    #subscriptions actions
     def new_subscription(self):
         print("Clicked: New Subscription")
 
     def edit_subscription(self):
-        print("Clicked: Edit Subscription")
+        #when a suvscription is selected and edit is clicked the code blow prints the name
+        selected = self.tree.selection()
+        if not selected:
+            print("No subscription selected for edit")
+            return
+
+        item = self.tree.item(selected[0])
+        idk = item["values"][0]
+        print(idk)
+        SubscriptionsZoomedWindow(self)
+        
 
     def delete_subscription(self):
         print("Clicked: Delete Subscription")
