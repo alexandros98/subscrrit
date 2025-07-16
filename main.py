@@ -1,32 +1,46 @@
 import tkinter as tk
 from tkinter import ttk
 
-# Create main window
-root = tk.Tk()
-root.title("Tkinter Containers Example")
-root.geometry("1000x600")
+class SubscriptionsZoomedWindow(tk.Toplevel):
+    def __init__(self, master=None, subscription_data=None):
+        super().__init__(master)
+        self.title("Subscription Information")
+        self.geometry("500x500")
+        self.configure(padx=20, pady=20)
 
-style = ttk.Style()
-style.configure("My.TFrame", borderwidth=2, relief="solid")
-style.configure("Border.TLabel", padding=5, borderwidth=2, relief="solid")
+        options_frame = ttk.LabelFrame(self, text="Options", padding=10)
+        options_frame.pack(fill="x", padx=10, pady=(0, 10))
 
-#--------------FRAME 1--------------
-frame1 = ttk.Frame(root, padding="10", style="My.TFrame")
-frame1.pack(fill="both", pady=10,side="left", expand=True)
+        save_button = ttk.Button(options_frame, text="Save", command=self.on_save)
+        close_button = ttk.Button(options_frame, text="Close", command=self.destroy)
+        save_button.pack(side="left", padx=5)
+        close_button.pack(side="left", padx=5)
 
-label1 =  ttk.Label(frame1, text="This is a frame with padding",style="Border.TLabel")
-label1.pack(pady=10)
-label2 = ttk.Label(frame1, text="It contains labels and buttons",style="Border.TLabel")
-label2.pack(pady=10)
+        form_frame = ttk.LabelFrame(self, text="Subscription Details", padding=10)
+        form_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-#--------------FRAME 2--------------
-frame2 = ttk.Frame(root, padding="10", style="My.TFrame")
-frame2.pack(fill="both", pady=10, side="right",expand=True)  
+        fields = ["Product Name", "Family", "Purchase Date", "Expiration Date", "Quantity"]
+        self.entries = {}
 
-label1 =  ttk.Label(frame2, text="This is a frame with padding",style="Border.TLabel")
-label1.pack(pady=10)
-label2 = ttk.Label(frame2, text="It contains labels and buttons",style="Border.TLabel")
-label2.pack(pady=10)
+        for i, field in enumerate(fields):
+            label = ttk.Label(form_frame, text=field + ":")
+            entry = ttk.Entry(form_frame, width=40)
+            label.grid(row=i, column=0, sticky="e", padx=5, pady=5)
+            entry.grid(row=i, column=1, sticky="w", padx=5, pady=5)
+            self.entries[field] = entry
 
-# Start the main event loop
-root.mainloop()
+        if subscription_data:
+            for key, value in zip(fields, subscription_data):
+                self.entries[key].insert(0, str(value))
+
+    def on_save(self):
+        values = {field: entry.get() for field, entry in self.entries.items()}
+        print("Saved values:", values)
+        self.destroy()
+
+# Run test
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()
+    SubscriptionsZoomedWindow(root)
+    root.mainloop()

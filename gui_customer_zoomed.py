@@ -304,16 +304,15 @@ class CustomerZoomedWindow(tk.Toplevel):
         print("Clicked: New Subscription")
 
     def edit_subscription(self):
-        #when a suvscription is selected and edit is clicked the code blow prints the name
         selected = self.tree.selection()
         if not selected:
-            print("No subscription selected for edit")
+            messagebox.showwarning("No Selection", "Please select a subscription to edit.")
             return
 
         item = self.tree.item(selected[0])
-        idk = item["values"][0]
-        print(idk)
-        SubscriptionsZoomedWindow(self)
+        subscription_data = item["values"]
+        print("Editing subscription:", subscription_data)
+        self.sub_window = SubscriptionsZoomedWindow(self, subscription_data=subscription_data)
         
 
     def delete_subscription(self):
